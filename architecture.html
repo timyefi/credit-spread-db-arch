@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>credit-spread-db 技术架构手册 · 信用利差数据库</title>
+<meta name="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(15视角分析逻辑/契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:title" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta property="og:description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(15视角分析逻辑/契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+<meta property="og:url" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="投研AI家园">
+<meta itemprop="name" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(15视角分析逻辑/契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+
 <meta name="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
 <meta property="og:title" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
 <meta property="og:description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
@@ -937,6 +948,75 @@ chart_industry_spread([<span class="st">"煤炭"</span>,<span class="st">"钢铁
         <tr><td>④ 只复用图表</td><td>L4</td><td>matplotlib + pandas</td><td>无</td><td>PNG 图表</td></tr>
       </tbody>
     </table>
+
+    <h3 class="reveal">潜在应用：从数据库到研究产出</h3>
+    <p class="reveal">数据库本身不是终点——15 个视角 × 日度时序 × 阈值框架组合在一起，可以支撑三类高阶应用：</p>
+
+    <div class="modgrid reveal" style="grid-template-columns:repeat(3,1fr)">
+      <div class="modcard">
+        <span class="mlayer" style="background:var(--c-teal)">应用 A</span>
+        <div class="mname">市场回顾与复盘</div>
+        <div class="mdesc">用历史利差序列还原"当时市场在交易什么"</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">data_snapshot + 阈值 + 视角逻辑</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">周度/月度/年度信用利差复盘报告</span></div>
+        </div>
+        <ul style="font-size:13px;color:var(--c-muted);margin-top:12px;padding-left:16px;line-height:2">
+          <li>周度：各视角环比变动 + 驱动归因（资金/供给/事件）</li>
+          <li>月度：利差中枢漂移 + 分位数变迁 + 行业轮动排名</li>
+          <li>年度：信用周期定位（扩张→平稳→收缩→危机）+ 策略回顾</li>
+          <li>事件复盘：永煤/恒大/城投化债前后各视角信号传导时间线</li>
+        </ul>
+      </div>
+      <div class="modcard">
+        <span class="mlayer" style="background:var(--c-gold-deep)">应用 B</span>
+        <div class="mname">规律挖掘与季节性</div>
+        <div class="mdesc">从长序列中发现可重复的统计规律</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">3-5年日度利差 + 一级发行 + ETF规模</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">季节性图谱 / 条件概率 / 领先滞后关系</span></div>
+        </div>
+        <ul style="font-size:13px;color:var(--c-muted);margin-top:12px;padding-left:16px;line-height:2">
+          <li>季节性：1月配置盘入场→利差收窄 / 季末理财赎回→走阔</li>
+          <li>条件概率：一级认购倍数&lt;1.5 后一周利差走阔概率</li>
+          <li>领先滞后：票据逾期 → 6-12月后债券违约（视角10→11）</li>
+          <li>供给冲击：二永净融资&gt;500亿/周 → 2-3周后利差走阔幅度</li>
+          <li>ETF效应：规模单周增&gt;50亿 → 成分券利差收窄幅度</li>
+        </ul>
+      </div>
+      <div class="modcard">
+        <span class="mlayer" style="background:var(--c-primary)">应用 C</span>
+        <div class="mname">策略探索与回测</div>
+        <div class="mdesc">将阈值判断转化为可回测的交易信号</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">阈值框架 + 评分卡 + 历史序列</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">信号序列 / 回测收益 / 策略参数</span></div>
+        </div>
+        <ul style="font-size:13px;color:var(--c-muted);margin-top:12px;padding-left:16px;line-height:2">
+          <li>分位数策略：&gt;80%分位买入 / &lt;20%分位卖出 → 计算持有期收益</li>
+          <li>评分卡择时：5维度得分→久期/评级/品种建议→模拟组合</li>
+          <li>品种轮动：永续溢价&gt;20bp→做多二级做空永续→均值回归</li>
+          <li>期限择时：曲线陡峭化→拉久期 / 倒挂→缩久期</li>
+          <li>下沉策略：等级利差&gt;30bp→下沉AA+ / &lt;10bp→回到AAA</li>
+          <li>供给博弈：批文放量→等利差走阔→配置窗口买入</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout tip reveal">
+      <div class="ct">从数据到 Alpha 的路径</div>
+      数据库提供的是<strong>原始信号</strong>（利差、分位数、评分卡得分）；规律挖掘将信号转化为<strong>条件概率</strong>（"当 X 发生时，Y 的概率是 Z%"）；策略回测将条件概率转化为<strong>可执行的交易规则</strong>并验证其经济显著性。三层递进，每一层都建立在前一层之上。
+    </div>
+
+    <details class="reveal">
+      <summary>回测实现路径（技术细节）</summary>
+      <div class="dbody">
+        <p><strong>数据准备</strong>：<code>data_snapshot.json</code> 提供 52 指标日度序列（2026-05 起），更长历史可通过 DM API <code>get_yield_curve()</code> 按月拼接（每次≤1月跨度）回溯至 2022 年。</p>
+        <p><strong>信号生成</strong>：读取 <code>thresholds.md</code> 的三档阈值 → 对每日利差标记状态（偏紧/中性/偏宽）→ 状态切换日即为信号日。</p>
+        <p><strong>收益计算</strong>：信号日 → 持有 N 周 → 计算期间利差变动（资本利得代理）+ 票息收入 → 年化 → 与基准（持有AAA 3Y不动）对比。</p>
+        <p><strong>参数敏感性</strong>：阈值本身可调（回验方法论见上节），持有期 N 可调（1/2/4/8周），评级/期限维度可切换——形成参数网格搜索。</p>
+      </div>
+    </details>
   </div>
 </section>
 
