@@ -37,6 +37,17 @@
 <meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
 <meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
 
+<meta name="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:title" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta property="og:description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+<meta property="og:url" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="投研AI家园">
+<meta itemprop="name" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+
 <meta name="description" content="信用利差数据库（credit-spread-db）技术架构手册：11视角×5数据源×4取数引擎的解耦架构、接口契约与集成指南。作者：叶青">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
@@ -679,9 +690,47 @@ etf = uf.get_etf([<span class="st">"511260"</span>], <span class="st">"20260617"
   <div class="wrap">
     <div class="reveal">
       <div class="sec-kicker">Chapter 04 · Knowledge Layer</div>
-      <h2>知识层：契约、M码、阈值与快照</h2>
-      <p class="lead">知识层是纯静态文件，<strong>不依赖任何运行时</strong>。它是整个数据库的"大脑皮层"——取数靠它找 M码，计算靠它定公式，点评靠它判松紧。</p>
+      <h2>知识层：视角逻辑、契约、M码与快照</h2>
+      <p class="lead">知识层是纯静态文件，<strong>不依赖任何运行时</strong>。它是整个数据库的"大脑皮层"——其中最核心的不是阈值数字，而是<strong>15 个视角的分析逻辑</strong>：即机构多年积累的"从哪些维度看信用利差、数据怎么用"的方法论框架。</p>
     </div>
+
+    <h3 class="reveal">视角分析逻辑 · view_definitions.md（核心资产）</h3>
+    <p>这是知识层最有价值的部分——等价于机构内部积累了多年的 Excel 数据库使用手册。每个视角定义了<strong>看什么、怎么算、怎么解读、什么信号对应什么操作</strong>。</p>
+
+    <table class="reveal">
+      <thead><tr><th>#</th><th>视角</th><th>核心问题</th><th>分析逻辑（数据怎么用）</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>信用利差总表</td><td>信用债贵不贵？</td><td>评级×期限矩阵 → 减国开债 → 分位数定位历史位置（&gt;80%=便宜，&lt;20%=贵）</td></tr>
+        <tr><td>2</td><td>城投债利差</td><td>哪个区域被错杀？</td><td>各省中位数 → 2022年以来分位 → 配合财政/债务率 → 识别区域分化（强省vs弱省差50-200bp）</td></tr>
+        <tr><td>3</td><td>二永债利差</td><td>银行资本工具风险定价合理吗？</td><td>二级/永续分别减国开 → 永续溢价=减记+不赎回风险定价 → AA+vs AAA=中小银行风险</td></tr>
+        <tr><td>4</td><td>品种利差</td><td>跨品种哪里有估值洼地？</td><td>二级-普信 / 永续-二级 / TLAC-二级 / 美元-境内 → 溢价偏离合理区间=轮动机会</td></tr>
+        <tr><td>5</td><td>行业利差</td><td>哪个行业信用风险在恶化？</td><td>6大产业×3评级中位数 → 周环比&gt;+10bp=走阔预警 → 行业利差变化领先评级调整</td></tr>
+        <tr><td>6</td><td>期限利差</td><td>拉久期划算吗？</td><td>5Y-1Y / 10Y-1Y / 30Y-10Y → 倒挂=短期风险&gt;长期 → 陡峭化=拉久期更划算</td></tr>
+        <tr><td>7</td><td>等级利差</td><td>信用下沉还有性价比吗？</td><td>AAA-AA+ / AA+-AA / AA-AA- → 收窄=下沉不划算 → 走阔=弱资质被抛弃</td></tr>
+        <tr><td>8</td><td>评级调整</td><td>信用环境在改善还是恶化？</td><td>周度下调/上调/终止数量 → 批量下调=行业性风险 → 上调&gt;下调=环境改善</td></tr>
+        <tr><td>9</td><td>高利差主体</td><td>AAA里谁"名不副实"？</td><td>筛选AAA中行权利差&gt;100bp → 市场已定价高风险 → 可能先于评级下调被抛弃</td></tr>
+        <tr><td>10</td><td>非标舆情</td><td>有没有估值捕捉不到的风险？</td><td>票据逾期/非标违约/审计非标意见 → 领先债券违约6-12月 → 城投"技术性违约"信号</td></tr>
+        <tr><td>11</td><td>违约展期</td><td>信用事件频率在加速吗？</td><td>周度新增违约/展期 → 累计违约率YoY → 频率加速=系统性风险升温</td></tr>
+        <tr><td>12</td><td>一级发行</td><td>边际供需是强还是弱？</td><td>发行利率-二级估值 → 正=需求弱(给溢价) → 负=抢券 → 认购倍数辅助确认</td></tr>
+        <tr><td>13</td><td>长端性价比</td><td>10Y+信用债值得配置吗？</td><td>Y_10Y - 流动性折价 - R007资金成本 &gt; 0 = 正carry → 有配置价值</td></tr>
+        <tr><td>14</td><td>二永供给</td><td>供给冲击来了吗？</td><td>大行资本补充计划 + 批文 + 周净融资 → 放量=阶段性走阔→配置窗口</td></tr>
+        <tr><td>15</td><td>ETF规模</td><td>被动资金在流入还是流出？</td><td>份额变化 → 成分券vs非成分券利差 → 规模扩大=利好利差收窄（指数效应）</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip reveal">
+      <div class="ct">框架 > 数据</div>
+      上表的价值不在于具体数字，而在于<strong>分析逻辑本身</strong>——"从什么角度看、数据怎么组合、信号怎么解读、对应什么操作"。这套逻辑等价于机构内部积累多年的 Excel 数据库使用手册。团队可以替换数据源、更新阈值，但分析框架是核心资产。<code>view_definitions.md</code> 设计为 preserve 模式，鼓励用户补充自己团队的视角。
+    </div>
+
+    <details class="reveal">
+      <summary>视角间的联动关系（信号传导链）</summary>
+      <div class="dbody">
+        <p><strong>宏观→微观传导</strong>：资金面收紧（R007↑）→ 期限利差压缩（视角6）→ 短端利差走阔（视角1）→ 一级需求弱化（视角12）→ 等级利差走阔（视角7）→ 弱资质主体高利差（视角9）</p>
+        <p><strong>信用事件传导</strong>：非标舆情（视角10）→ 评级下调（视角8）→ 行业利差走阔（视角5）→ 区域城投分化（视角2）→ 违约/展期（视角11）</p>
+        <p><strong>供给冲击传导</strong>：二永批文放量（视角14）→ 一级发行放量（视角12）→ 二永利差走阔（视角3）→ 品种比价失衡（视角4）→ ETF被动承接（视角15）</p>
+      </div>
+    </details>
 
     <h3 class="reveal">data_contract.yaml · 单一事实源</h3>
     <p>11 视角 × 5 数据源的完整契约。所有利差公式、阈值、M码映射都以此文件为准，Agent 与脚本不得硬编码。</p>
