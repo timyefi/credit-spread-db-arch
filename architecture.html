@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>credit-spread-db 技术架构手册 · 信用利差数据库</title>
+<meta name="description" content="信用利差数据库（credit-spread-db）技术架构手册：11视角×5数据源×4取数引擎的解耦架构、接口契约与集成指南。作者：叶青">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+/* ============================================================
+   fioutput Report Design System · Navy
+   平面 · 无圆角 · 无阴影 · 无斑马纹 · 衬线正文
+   ============================================================ */
+:root{
+  --c-primary:#051C2C;
+  --c-deep:#0A2E44;
+  --c-mid:#0E4D64;
+  --c-teal:#12707E;
+  --c-steel:#4A7A8C;
+  --c-gold:#C8A45A;
+  --c-gold-deep:#8C6D3F;
+  --c-ink:#16242E;
+  --c-body:#33424D;
+  --c-muted:#6B7D88;
+  --c-line:#C9D4DB;
+  --c-line-light:#E4EAEE;
+  --c-bg:#FFFFFF;
+  --c-bg-soft:#F4F7F9;
+  --c-bg-navy:#051C2C;
+  --c-bg-navy2:#0A2E44;
+  --font-body:Georgia,"STSong","SimSun",serif;
+  --font-code:Consolas,"Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;border-radius:0!important}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  color:var(--c-body);
+  background:var(--c-bg);
+  line-height:1.75;
+  font-size:16px;
+}
+::selection{background:var(--c-gold);color:var(--c-primary)}
+
+/* ---------- 顶部阅读进度条 ---------- */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--c-gold);z-index:1000;transition:width .1s linear}
+
+/* ---------- 容器 ---------- */
+.wrap{max-width:1126px;margin:0 auto;padding:0 64px}
+
+/* ---------- 粘性导航 ---------- */
+nav.toc{
+  position:sticky;top:0;z-index:900;
+  background:var(--c-bg-navy);
+  border-bottom:3px solid var(--c-gold);
+}
+nav.toc .wrap{display:flex;align-items:center;gap:0;padding:0 64px;overflow-x:auto}
+nav.toc .brand{
+  color:#fff;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
+  padding:14px 22px 14px 0;white-space:nowrap;border-right:1px solid rgba(255,255,255,.18);
+  margin-right:8px;font-weight:bold;
+}
+nav.toc a{
+  color:#AFC2CD;text-decoration:none;font-size:13px;padding:16px 15px;white-space:nowrap;
+  border-bottom:3px solid transparent;margin-bottom:-3px;transition:color .25s,border-color .25s;
+}
+nav.toc a:hover{color:#fff}
+nav.toc a.active{color:var(--c-gold);border-bottom-color:var(--c-gold)}
+
+/* ---------- 蓝图式头部 ---------- */
+header.blueprint{
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 48px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 48px),
+    linear-gradient(160deg,var(--c-bg-navy) 0%,var(--c-bg-navy2) 70%,#0E4D64 100%);
+  color:#fff;border-bottom:4px solid var(--c-gold);
+}
+header.blueprint .wrap{padding-top:64px;padding-bottom:56px}
+.doc-type{
+  display:inline-block;font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--c-gold);border:1px solid var(--c-gold);padding:6px 14px;margin-bottom:26px;
+}
+header.blueprint h1{
+  font-size:52px;line-height:1.18;font-weight:bold;color:#fff;letter-spacing:.01em;margin-bottom:20px;
+}
+header.blueprint h1 .thin{display:block;font-size:26px;font-weight:normal;color:#9FB6C4;margin-top:10px;letter-spacing:.06em}
+.doc-sub{font-size:17px;color:#C4D3DC;max-width:760px;margin-bottom:34px}
+.doc-meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid rgba(255,255,255,.2)}
+.doc-meta span{
+  padding:14px 26px 4px 0;margin-right:26px;font-size:13.5px;color:#9FB6C4;
+}
+.doc-meta b{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-gold);margin-bottom:4px;font-weight:normal}
+.doc-meta a{color:#fff;text-decoration:none;border-bottom:1px solid var(--c-gold)}
+.doc-meta a:hover{color:var(--c-gold)}
+
+/* ---------- 统计条 ---------- */
+.statband{background:var(--c-bg-soft);border-bottom:1px solid var(--c-line-light)}
+.statband .wrap{display:flex;flex-wrap:wrap;padding-top:0;padding-bottom:0}
+.stat{
+  flex:1 1 0;min-width:150px;padding:30px 22px;border-right:1px solid var(--c-line-light);
+  transition:background .3s;
+}
+.stat:last-child{border-right:none}
+.stat:hover{background:#EBF1F4}
+.stat .num{font-size:42px;font-weight:bold;color:var(--c-primary);line-height:1;font-family:var(--font-body)}
+.stat .num .unit{font-size:18px;color:var(--c-gold-deep);margin-left:3px}
+.stat .lbl{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-muted);margin-top:8px}
+
+/* ---------- 章节通用 ---------- */
+section{padding:64px 0 8px;border-bottom:1px solid var(--c-line-light)}
+section:last-of-type{border-bottom:none}
+.sec-kicker{
+  font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-gold-deep);
+  display:flex;align-items:center;gap:14px;margin-bottom:12px;
+}
+.sec-kicker::after{content:"";flex:1;height:1px;background:var(--c-line)}
+h2{font-size:32px;color:var(--c-primary);font-weight:bold;margin-bottom:8px;line-height:1.3}
+h3{font-size:21px;color:var(--c-deep);font-weight:bold;margin:34px 0 12px;border-left:4px solid var(--c-gold);padding-left:14px}
+h4{font-size:16.5px;color:var(--c-mid);margin:22px 0 8px;font-weight:bold}
+p{margin-bottom:14px}
+.lead{font-size:17.5px;color:var(--c-ink);margin-bottom:22px}
+strong{color:var(--c-ink)}
+
+/* 滚动显现 */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+.reveal.visible{opacity:1;transform:none}
+
+/* ---------- 分层架构条 ---------- */
+.layers{margin:30px 0 10px}
+.layer{
+  display:flex;align-items:stretch;border:1px solid var(--c-line);border-bottom:none;
+  background:#fff;transition:background .3s,border-color .3s;
+}
+.layer:last-child{border-bottom:1px solid var(--c-line)}
+.layer:hover{background:var(--c-bg-soft)}
+.layer .tag{
+  flex:0 0 120px;background:var(--c-primary);color:#fff;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;padding:18px 8px;transition:background .3s;
+}
+.layer:hover .tag{background:var(--c-teal)}
+.layer .tag .lid{font-size:20px;font-weight:bold;letter-spacing:.06em}
+.layer .tag .lname{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-gold);margin-top:4px;text-align:center}
+.layer .body{flex:1;padding:16px 22px;display:flex;flex-direction:column;justify-content:center}
+.layer .body .lt{font-weight:bold;color:var(--c-ink);font-size:16px}
+.layer .body .ld{font-size:13.5px;color:var(--c-muted);margin-top:2px}
+.layer .mods{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{
+  font-family:var(--font-code);font-size:12px;background:var(--c-bg-soft);border:1px solid var(--c-line);
+  padding:3px 10px;color:var(--c-mid);transition:all .25s;cursor:default;
+}
+.chip:hover{background:var(--c-primary);color:var(--c-gold);border-color:var(--c-primary)}
+.layer .solo{
+  flex:0 0 130px;display:flex;align-items:center;justify-content:center;font-size:11.5px;
+  letter-spacing:.1em;color:var(--c-teal);border-left:1px dashed var(--c-line);text-transform:uppercase;
+}
+
+/* ---------- DAG 图容器 ---------- */
+.chartbox{border:1px solid var(--c-line);background:#fff;margin:26px 0}
+.chartbox .chead{
+  background:var(--c-primary);color:#fff;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;
+  padding:10px 18px;display:flex;justify-content:space-between;align-items:center;
+}
+.chartbox .chead .cnote{color:var(--c-gold);letter-spacing:.06em;text-transform:none}
+#dag{width:100%;height:560px}
+
+/* ---------- 模块卡片网格 ---------- */
+.modgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--c-line);border-right:none;border-bottom:none;margin:26px 0}
+.modcard{border-right:1px solid var(--c-line);border-bottom:1px solid var(--c-line);padding:22px 20px;background:#fff;transition:background .3s;position:relative}
+.modcard:hover{background:var(--c-bg-soft)}
+.modcard .mlayer{position:absolute;top:0;right:0;font-size:10px;letter-spacing:.14em;background:var(--c-primary);color:var(--c-gold);padding:3px 9px}
+.modcard .mname{font-family:var(--font-code);font-size:15px;font-weight:bold;color:var(--c-primary);margin-bottom:6px;padding-right:40px}
+.modcard .mdesc{font-size:13px;color:var(--c-muted);margin-bottom:14px;min-height:38px}
+.contract{font-family:var(--font-code);font-size:11.5px;line-height:1.9}
+.contract .crow{display:flex;gap:8px}
+.contract .ck{flex:0 0 38px;color:#fff;text-align:center;font-weight:bold;font-size:10.5px;padding-top:2px}
+.contract .ck.in{background:var(--c-teal)}
+.contract .ck.out{background:var(--c-gold-deep)}
+.contract .ck.dep{background:var(--c-steel)}
+.contract .cv{color:var(--c-body);word-break:break-all}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+th{
+  text-align:left;background:transparent;color:var(--c-primary);font-size:12px;letter-spacing:.12em;
+  text-transform:uppercase;border-bottom:2px solid var(--c-primary);padding:10px 12px;font-weight:bold;
+}
+td{border-bottom:1px solid var(--c-line-light);padding:10px 12px;vertical-align:top;color:var(--c-body)}
+tr:hover td{background:var(--c-bg-soft)}
+td code,th code{font-family:var(--font-code);font-size:12.5px;background:var(--c-bg-soft);border:1px solid var(--c-line-light);padding:1px 6px;color:var(--c-mid)}
+
+/* ---------- 代码块 + 复制 ---------- */
+.codeblock{position:relative;margin:18px 0;border:1px solid var(--c-line);background:var(--c-bg-navy)}
+.codeblock .clabel{
+  display:flex;justify-content:space-between;align-items:center;background:var(--c-deep);
+  color:var(--c-gold);font-family:var(--font-code);font-size:11.5px;letter-spacing:.08em;padding:7px 14px;
+}
+.codeblock pre{padding:16px 18px;overflow-x:auto;font-family:var(--font-code);font-size:13px;line-height:1.7;color:#D7E3EA}
+.codeblock .copy{
+  position:absolute;top:5px;right:8px;background:transparent;border:1px solid var(--c-gold);
+  color:var(--c-gold);font-family:var(--font-code);font-size:10.5px;padding:3px 10px;cursor:pointer;
+  letter-spacing:.1em;transition:all .25s;
+}
+.codeblock .copy:hover{background:var(--c-gold);color:var(--c-primary)}
+.codeblock .copy.done{background:var(--c-teal);border-color:var(--c-teal);color:#fff}
+.cm{color:#7A93A3}.kw{color:#E8C87A}.st{color:#9FD8CB}.fn{color:#8AB8D8}
+
+/* ---------- 提示框 callout ---------- */
+.callout{border-left:4px solid var(--c-teal);background:var(--c-bg-soft);padding:16px 20px;margin:20px 0;font-size:14px}
+.callout.tip{border-left-color:var(--c-gold)}
+.callout.warn{border-left-color:#B0563B}
+.callout .ct{font-weight:bold;color:var(--c-primary);font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.callout.tip .ct{color:var(--c-gold-deep)}
+.callout.warn .ct{color:#B0563B}
+
+/* ---------- 折叠面板 ---------- */
+details{border:1px solid var(--c-line);margin:18px 0;background:#fff}
+details summary{
+  cursor:pointer;padding:14px 18px;font-weight:bold;color:var(--c-primary);font-size:15px;
+  background:var(--c-bg-soft);list-style:none;display:flex;justify-content:space-between;align-items:center;
+  transition:background .25s;
+}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"+";font-family:var(--font-code);font-size:18px;color:var(--c-gold-deep);transition:transform .3s}
+details[open] summary::after{transform:rotate(45deg)}
+details summary:hover{background:#EBF1F4}
+details .dbody{padding:18px 20px;border-top:1px solid var(--c-line)}
+
+/* ---------- Tab ---------- */
+.tabs{margin:26px 0;border:1px solid var(--c-line)}
+.tabbar{display:flex;background:var(--c-primary);overflow-x:auto}
+.tabbar button{
+  background:transparent;border:none;color:#9FB6C4;font-family:var(--font-body);font-size:14px;
+  padding:14px 24px;cursor:pointer;border-bottom:3px solid transparent;transition:all .25s;white-space:nowrap;
+}
+.tabbar button:hover{color:#fff}
+.tabbar button.active{color:var(--c-gold);border-bottom-color:var(--c-gold);background:rgba(255,255,255,.05)}
+.tabpanel{display:none;padding:26px 26px 12px;background:#fff}
+.tabpanel.active{display:block;animation:fadein .4s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---------- 降级链 ---------- */
+.chain{display:flex;align-items:stretch;gap:0;margin:26px 0;flex-wrap:wrap}
+.cnode{
+  flex:1 1 0;min-width:150px;border:1px solid var(--c-line);background:#fff;padding:18px 16px;
+  position:relative;transition:background .3s;
+}
+.cnode:hover{background:var(--c-bg-soft)}
+.cnode .cp{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-gold-deep);margin-bottom:6px}
+.cnode .cn{font-family:var(--font-code);font-weight:bold;color:var(--c-primary);font-size:14.5px}
+.cnode .cd{font-size:12px;color:var(--c-muted);margin-top:6px}
+.carrow{flex:0 0 44px;display:flex;align-items:center;justify-content:center;color:var(--c-teal);font-size:20px;font-family:var(--font-code)}
+
+/* ---------- 阈值色块 ---------- */
+.th-tight{color:#B0563B;font-weight:bold}
+.th-mid{color:var(--c-gold-deep);font-weight:bold}
+.th-loose{color:var(--c-teal);font-weight:bold}
+
+/* ---------- 页脚 ---------- */
+footer.rpt{background:var(--c-bg-navy);color:#9FB6C4;border-top:4px solid var(--c-gold);margin-top:64px}
+footer.rpt .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;padding-top:34px;padding-bottom:34px;font-size:13px}
+footer.rpt a{color:var(--c-gold);text-decoration:none;border-bottom:1px solid transparent}
+footer.rpt a:hover{border-bottom-color:var(--c-gold)}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:899px){
+  .wrap{padding:0 22px}
+  nav.toc .wrap{padding:0 22px}
+  header.blueprint h1{font-size:34px}
+  header.blueprint h1 .thin{font-size:19px}
+  .modgrid{grid-template-columns:1fr}
+  .layer{flex-wrap:wrap}
+  .layer .tag{flex:1 1 100%;flex-direction:row;gap:12px;padding:10px 16px}
+  .layer .solo{flex:1 1 100%;border-left:none;border-top:1px dashed var(--c-line);padding:8px}
+  .stat .num{font-size:30px}
+  #dag{height:480px}
+  .doc-meta span{margin-right:14px;padding-right:14px}
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<!-- ================= 粘性导航 ================= -->
+<nav class="toc">
+  <div class="wrap">
+    <span class="brand">CS-DB · ARCH</span>
+    <a href="#overview" class="active">01 总览</a>
+    <a href="#registry">02 注册表</a>
+    <a href="#fetcher">03 取数层</a>
+    <a href="#knowledge">04 知识层</a>
+    <a href="#output">05 输出层</a>
+    <a href="#integration">06 集成模式</a>
+    <a href="#get-skill">07 获取 Skill</a>
+  </div>
+</nav>
+
+<!-- ================= 蓝图式头部 ================= -->
+<header class="blueprint">
+  <div class="wrap">
+    <div class="doc-type">Technical Architecture Manual · 解耦与集成指南</div>
+    <h1>credit-spread-db
+      <span class="thin">信用利差数据库 · 技术架构手册</span>
+    </h1>
+    <p class="doc-sub">面向集成者与二次开发者：本手册将信用利差数据库拆解为「数据源 → 取数 → 知识 → 计算 → 输出」五层独立模块，逐层给出接口契约（IN / OUT / DEP）、最小可运行示例与替换策略——你可以只取数、只查知识库、或只复用图表引擎，而无需吞下整个 Skill。</p>
+    <div class="doc-meta">
+      <span><b>作者</b>叶青</span>
+      <span><b>版本</b>v1.0.0</span>
+      <span><b>分层</b>L0 – L4 · 5 层</span>
+      <span><b>开源仓库</b><a href="https://github.com/yeqing-credit/credit-spread-db-arch" id="gh-link-top">GitHub →</a></span>
+      <span><b>数据契约</b><code style="font-family:var(--font-code);font-size:12px;color:var(--c-gold)">data_contract.yaml</code></span>
+    </div>
+  </div>
+</header>
+
+<!-- ================= 统计条 ================= -->
+<div class="statband">
+  <div class="wrap">
+    <div class="stat"><div class="num"><span class="cnt" data-target="11">0</span><span class="unit">个</span></div><div class="lbl">跟踪视角</div></div>
+    <div class="stat"><div class="num"><span class="cnt" data-target="5">0</span><span class="unit">路</span></div><div class="lbl">数据源</div></div>
+    <div class="stat"><div class="num"><span class="cnt" data-target="4">0</span><span class="unit">台</span></div><div class="lbl">取数引擎</div></div>
+    <div class="stat"><div class="num"><span class="cnt" data-target="380">0</span><span class="unit">+</span></div><div class="lbl">EDB M码</div></div>
+    <div class="stat"><div class="num"><span class="cnt" data-target="52">0</span><span class="unit">条</span></div><div class="lbl">快照指标</div></div>
+    <div class="stat"><div class="num"><span class="cnt" data-target="6">0</span><span class="unit">套</span></div><div class="lbl">图表 / 点评</div></div>
+  </div>
+</div>
+
+<!-- ================= 01 系统总览 ================= -->
+<section id="overview">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 01 · System Overview</div>
+      <h2>系统总览：五层解耦架构</h2>
+      <p class="lead">信用利差数据库不是一个"黑盒看板"，而是一条<strong>自下而上、逐层可独立调用</strong>的管线。每一层只依赖下一层的公开接口，任何一层都可以被单独抽出使用，或被等价替换。</p>
+    </div>
+
+    <div class="layers reveal">
+      <div class="layer">
+        <div class="tag"><span class="lid">L4</span><span class="lname">Output</span></div>
+        <div class="body">
+          <span class="lt">输出层 · 图表 / 点评 / 看板</span>
+          <span class="ld">把计算结果渲染成周报可用的 PNG 图表、文字点评与自包含 HTML 看板</span>
+          <div class="mods"><span class="chip">chart_credit_spread.py</span><span class="chip">commentary_credit_spread.md</span><span class="chip">dashboard_template.html</span></div>
+        </div>
+        <div class="solo">可独立使用</div>
+      </div>
+      <div class="layer">
+        <div class="tag"><span class="lid">L3</span><span class="lname">Compute</span></div>
+        <div class="body">
+          <span class="lt">计算层 · 利差引擎 / 阈值判断 / 评分卡</span>
+          <span class="ld">CS / TS / RS / PS 四类利差减法 + 历史分位数 + 信用周期评分卡</span>
+          <div class="mods"><span class="chip">CS=Y信用−Y国开</span><span class="chip">Percentile</span><span class="chip">Scorecard×5维</span></div>
+        </div>
+        <div class="solo">可独立使用</div>
+      </div>
+      <div class="layer">
+        <div class="tag"><span class="lid">L2</span><span class="lname">Knowledge</span></div>
+        <div class="body">
+          <span class="lt">知识层 · 契约 / M码 / 阈值 / 视角定义 / 快照</span>
+          <span class="ld">11 视角数据契约、380+ EDB M码速查、阈值规则、52 指标离线快照</span>
+          <div class="mods"><span class="chip">data_contract.yaml</span><span class="chip">ifind_edb_codes.yaml</span><span class="chip">thresholds.md</span><span class="chip">view_definitions.md</span><span class="chip">data_snapshot.json</span></div>
+        </div>
+        <div class="solo">可独立使用</div>
+      </div>
+      <div class="layer">
+        <div class="tag"><span class="lid">L1</span><span class="lname">Fetcher</span></div>
+        <div class="body">
+          <span class="lt">取数层 · 四引擎 + 自动降级编排</span>
+          <span class="ld">DM Quant（100%覆盖）→ iFinD HTTP → AKShare → MCP，UnifiedFetcher 统一入口</span>
+          <div class="mods"><span class="chip">dm_fetcher.py</span><span class="chip">ifind_fetcher.py</span><span class="chip">akshare_fetcher.py</span><span class="chip">unified_fetcher.py</span></div>
+        </div>
+        <div class="solo">可独立使用</div>
+      </div>
+      <div class="layer">
+        <div class="tag"><span class="lid">L0</span><span class="lname">Source</span></div>
+        <div class="body">
+          <span class="lt">数据源层 · 五路行情供给</span>
+          <span class="ld">DM Quant API · iFinD HTTP · AKShare（免费）· Wind MCP · iFinD MCP</span>
+          <div class="mods"><span class="chip">DM Quant</span><span class="chip">iFinD HTTP</span><span class="chip">AKShare</span><span class="chip">Wind MCP</span><span class="chip">iFinD MCP</span></div>
+        </div>
+        <div class="solo">可独立使用</div>
+      </div>
+    </div>
+
+    <div class="callout tip reveal">
+      <div class="ct">解耦原则</div>
+      层与层之间只通过<strong>文件契约</strong>（YAML / JSON）与<strong>函数签名</strong>交互，没有运行时强依赖。取数层全部失效时，知识层的离线快照仍可支撑计算层完成演示与回测。
+    </div>
+
+    <div class="chartbox reveal">
+      <div class="chead"><span>模块依赖 DAG · Module Dependency Graph</span><span class="cnote">自下而上 · 箭头指向依赖方</span></div>
+      <div id="dag"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 02 模块注册表 ================= -->
+<section id="registry">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 02 · Module Registry</div>
+      <h2>模块注册表：接口契约一览</h2>
+      <p class="lead">每个模块一张"身份证"：<strong>IN</strong>（输入）/ <strong>OUT</strong>（输出）/ <strong>DEP</strong>（依赖）。集成时只需对照契约，无需阅读模块内部实现。</p>
+    </div>
+
+    <div class="modgrid reveal">
+      <div class="modcard">
+        <span class="mlayer">L1</span>
+        <div class="mname">dm_fetcher.py</div>
+        <div class="mdesc">DM Quant API 取数器，100% 覆盖 11 视角，29 条预置曲线</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">curve_name, terms[], date_range, config.json(dm)</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">DataFrame[yield] / dict[CS_* bp]</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">requests · DM app_key/secret</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L1</span>
+        <div class="mname">ifind_fetcher.py</div>
+        <div class="mdesc">最小 iFinD HTTP 客户端，仅 edb + data_pool 两个端点</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">M码串 / reportname+functionpara</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">list[dict] 行式记录</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">requests · access_token</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L1</span>
+        <div class="mname">akshare_fetcher.py</div>
+        <div class="mdesc">免费数据源：国债/国开基准、回购、存单、ETF 行情</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">symbol, date_range</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">DataFrame（失败返回空表）</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">akshare · 无 token</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L1</span>
+        <div class="mname">unified_fetcher.py</div>
+        <div class="mdesc">多源自动降级编排器，指标名→M码解析 + 降级链</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">indicator("中短票_AAA_3Y"), date_range, source</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">DataFrame[yield]</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">三个子 fetcher · edb_codes.yaml</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L2</span>
+        <div class="mname">data_contract.yaml</div>
+        <div class="mdesc">11 视角 × 5 数据源数据契约，公式与阈值单一事实源</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">—（声明式配置）</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">视角定义 / M码 / 阈值 / 公式</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">—</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L2</span>
+        <div class="mname">ifind_edb_codes.yaml</div>
+        <div class="mdesc">已验证 EDB M码速查 + 踩坑标注（4Y≠3Y 等）</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">指标中文名</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">M码（M00xxxxxxxx）</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">—</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L2</span>
+        <div class="mname">thresholds.md</div>
+        <div class="mdesc">阈值与判断规则：偏紧/中性/偏宽 + 信用周期四阶段</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">利差 bp 值</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">松紧判断 / 评分卡得分</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">—</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L2</span>
+        <div class="mname">data_snapshot.json</div>
+        <div class="mdesc">52 指标日度时序离线快照，取数失效时的兜底</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">指标名</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">[{d,v}] 时序数组</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">—</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L4</span>
+        <div class="mname">chart_credit_spread.py</div>
+        <div class="mdesc">6 个 matplotlib 图表函数，150dpi 周报级 PNG</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">DataFrame / 数值列表</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">fig + PNG 文件</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">matplotlib · pandas</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L4</span>
+        <div class="mname">commentary_*.md</div>
+        <div class="mdesc">6 套文字点评模板：总评/二永/风险/一级/行业/策略</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">利差变动 + 分位数</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">结构化点评段落</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">thresholds.md</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L4</span>
+        <div class="mname">dashboard_template.html</div>
+        <div class="mdesc">ECharts 看板模板，{{placeholder}} 占位符注入</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">利差矩阵 + HM1/HM2 热力数据</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">自包含 HTML 看板</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">ECharts 5.x CDN</span></div>
+        </div>
+      </div>
+      <div class="modcard">
+        <span class="mlayer">L3</span>
+        <div class="mname">利差计算引擎</div>
+        <div class="mdesc">CS/TS/RS/PS 减法 + 分位数，逻辑内嵌于契约与 Agent</div>
+        <div class="contract">
+          <div class="crow"><span class="ck in">IN</span><span class="cv">信用债 YTM + 国开债 YTM</span></div>
+          <div class="crow"><span class="ck out">OUT</span><span class="cv">利差 bp + 分位数 %</span></div>
+          <div class="crow"><span class="ck dep">DEP</span><span class="cv">data_contract.yaml</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="reveal">契约文件清单</h3>
+    <table class="reveal">
+      <thead><tr><th>文件</th><th>层</th><th>角色</th><th>格式</th><th>同步策略</th></tr></thead>
+      <tbody>
+        <tr><td><code>data_contract.yaml</code></td><td>L2</td><td>11 视角单一事实源</td><td>YAML</td><td>overwrite（始终更新）</td></tr>
+        <tr><td><code>fetcher/config.json</code></td><td>L1</td><td>API 凭证（iFinD token / DM key）</td><td>JSON</td><td>overwrite</td></tr>
+        <tr><td><code>knowledge/ifind_edb_codes.yaml</code></td><td>L2</td><td>已验证 M码速查</td><td>YAML</td><td>preserve（用户可扩）</td></tr>
+        <tr><td><code>knowledge/thresholds.md</code></td><td>L2</td><td>阈值与周期规则</td><td>MD</td><td>preserve</td></tr>
+        <tr><td><code>knowledge/view_definitions.md</code></td><td>L2</td><td>视角定义详解</td><td>MD</td><td>preserve</td></tr>
+        <tr><td><code>knowledge/data_snapshot_*.json</code></td><td>L2</td><td>离线时序快照</td><td>JSON</td><td>preserve</td></tr>
+        <tr><td><code>update-config.json</code></td><td>—</td><td>同步覆盖/保留清单</td><td>JSON</td><td>元配置</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 03 取数层 ================= -->
+<section id="fetcher">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 03 · Fetcher Layer</div>
+      <h2>取数层：四引擎与自动降级链</h2>
+      <p class="lead">取数层是整个数据库的"供水系统"。四台引擎各自独立，<strong>UnifiedFetcher</strong> 作为总阀按优先级自动降级——任何一台引擎停摆，管线不断流。</p>
+    </div>
+
+    <h3 class="reveal">降级链 · Fallback Chain</h3>
+    <div class="chain reveal">
+      <div class="cnode"><div class="cp">Priority 1</div><div class="cn">DM Quant API</div><div class="cd">100% 覆盖 11 视角<br>277 条中债/中证曲线</div></div>
+      <div class="carrow">→</div>
+      <div class="cnode"><div class="cp">Priority 2</div><div class="cn">iFinD HTTP</div><div class="cd">EDB M码 380+<br>data_pool 发行/存量</div></div>
+      <div class="carrow">→</div>
+      <div class="cnode"><div class="cp">Priority 3</div><div class="cn">AKShare</div><div class="cd">免费 · 仅国债/国开基准<br>ETF / 回购</div></div>
+      <div class="carrow">→</div>
+      <div class="cnode"><div class="cp">Priority 4</div><div class="cn">Wind / iFinD MCP</div><div class="cd">AI Agent 经 MCP 协议调用<br>兜底人工通道</div></div>
+    </div>
+
+    <div class="callout warn reveal">
+      <div class="ct">降级边界</div>
+      AKShare 降级<strong>只支持国债 / 国开债基准与 ETF</strong>。信用债 YTM（中短票、城投、二永）在 iFinD 与 DM 同时失效时不可用——此时 UnifiedFetcher 会抛出明确异常提示转用 Wind MCP，而非静默返回错误数据。
+    </div>
+
+    <h3 class="reveal">引擎一：DmFetcher（首选，100% 覆盖）</h3>
+    <p>基于 Dealing Matrix 量化 API，通过收益率曲线接口直接获取各评级各期限 YTM。<strong>29 条预置曲线</strong>覆盖中短票、企业债、城投、二永、基准、证券公司债、存单；<strong>17 个 API 端点</strong>覆盖曲线、个券估值、一级发行、基金净值、隐含评级、EDB、交易日历。</p>
+    <table class="reveal">
+      <thead><tr><th>方法</th><th>对应视角</th><th>输出</th><th>限流约束</th></tr></thead>
+      <tbody>
+        <tr><td><code>get_yield_curve()</code></td><td>视角 1–7</td><td>DataFrame[curve_term, valuation_date, yield]</td><td>期限≤5 · 跨度≤1月</td></tr>
+        <tr><td><code>get_spread_matrix()</code></td><td>视角 1 利差总表</td><td>dict[CS_* bp]（4评级×3期限）</td><td>单日调用</td></tr>
+        <tr><td><code>get_urban_spread()</code></td><td>视角 2 城投</td><td>dict（5评级利差 vs 国开）</td><td>单日调用</td></tr>
+        <tr><td><code>get_bank_capital_spread()</code></td><td>视角 3 二永</td><td>dict（6曲线利差 + 永续溢价）</td><td>单日调用</td></tr>
+        <tr><td><code>get_primary_issue()</code></td><td>视角 8 / 10 一级</td><td>list[dict] 发行记录（自动翻页）</td><td>跨度≤30天</td></tr>
+        <tr><td><code>get_fund_nav()</code></td><td>视角 11 ETF</td><td>DataFrame[nav, change_pct]</td><td>代码≤200 · 跨度≤1年</td></tr>
+      </tbody>
+    </table>
+
+    <div class="codeblock reveal">
+      <div class="clabel"><span>独立调用 · 最小可运行示例（DM）</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">from</span> fetcher <span class="kw">import</span> DmFetcher
+
+dm = DmFetcher()                      <span class="cm"># 自动读取 fetcher/config.json 的 dm 凭证</span>
+m  = dm.get_spread_matrix(<span class="st">"20260717"</span>) <span class="cm"># 视角1：AAA/AA+/AA/AA- × 1Y/3Y/5Y 利差(bp)</span>
+<span class="fn">print</span>(m[<span class="st">"CS_AAA_3Y"</span>])                <span class="cm"># → 例 21.43</span>
+
+curve = dm.get_yield_curve(<span class="st">"中短票_AAA"</span>, [<span class="st">"1Y"</span>,<span class="st">"3Y"</span>,<span class="st">"5Y"</span>],
+                           <span class="st">"20260617"</span>, <span class="st">"20260717"</span>)   <span class="cm"># 一个月时序</span></pre>
+    </div>
+
+    <h3 class="reveal">引擎二：UnifiedFetcher（自动降级总阀）</h3>
+    <p>核心方法 <code>get_yield(indicator, start, end, source="auto")</code>。指标名支持中文别名（<code>"中短票_AAA_3Y"</code>）或直接 M码；<code>_resolve_m_code()</code> 从 <code>ifind_edb_codes.yaml</code> 查表解析，iFinD 失败后按降级链自动切换。</p>
+
+    <div class="codeblock reveal">
+      <div class="clabel"><span>独立调用 · 自动降级示例</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">from</span> fetcher <span class="kw">import</span> UnifiedFetcher
+
+uf = UnifiedFetcher()
+uf.status()   <span class="cm"># 打印四数据源可用状态</span>
+
+<span class="cm"># auto：iFinD HTTP(M码) → AKShare(仅基准) → 抛异常提示转 MCP</span>
+y = uf.get_yield(<span class="st">"国开债_3Y"</span>, <span class="st">"20260617"</span>, <span class="st">"20260717"</span>)
+
+<span class="cm"># 指定源：跳过降级，直连某引擎</span>
+y2 = uf.get_yield(<span class="st">"中短票_AAA_3Y"</span>, <span class="st">"20260617"</span>, <span class="st">"20260717"</span>, source=<span class="st">"dm"</span>)
+
+etf = uf.get_etf([<span class="st">"511260"</span>], <span class="st">"20260617"</span>, <span class="st">"20260717"</span>)  <span class="cm"># ETF 需 AKShare</span></pre>
+    </div>
+
+    <h3 class="reveal">引擎三 / 四：iFinD HTTP 与 AKShare</h3>
+    <p><code>ifind_fetcher.py</code> 是<strong>约 120 行的最小客户端</strong>，只封装 <code>edb</code> 与 <code>data_pool</code> 两个端点，只需 <code>requests</code> + token 即可独立运行，无需安装完整 ifind-http-skill。<code>akshare_fetcher.py</code> 完全免费、无需 token，调用失败返回空 DataFrame 而非抛异常，天然适合做兜底。</p>
+
+    <details class="reveal">
+      <summary>data_pool 报表 ID 速查（视角 8 / 10 依赖）</summary>
+      <div class="dbody">
+        <table>
+          <thead><tr><th>报表 ID</th><th>用途</th><th>对应视角</th></tr></thead>
+          <tbody>
+            <tr><td><code>p05075</code></td><td>信用债发行规模</td><td>视角 8 一级发行</td></tr>
+            <tr><td><code>p05069</code></td><td>存量按类型（二永供给）</td><td>视角 10</td></tr>
+            <tr><td><code>p04650</code></td><td>发行按评级</td><td>视角 8</td></tr>
+            <tr><td><code>p03734</code></td><td>净融资</td><td>视角 10</td></tr>
+            <tr><td><code>p04956</code></td><td>利差分析</td><td>视角 1</td></tr>
+            <tr><td><code>p04983</code></td><td>存量按行业</td><td>视角 5</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <div class="callout tip reveal">
+      <div class="ct">替换策略</div>
+      要接入新数据源（如中债登直连），只需新建 <code>xxx_fetcher.py</code> 并实现 <code>get_yield / get_etf</code> 两个方法，再在 <code>unified_fetcher.py</code> 的降级链中注册优先级——<strong>知识层与输出层零改动</strong>。
+    </div>
+  </div>
+</section>
+
+<!-- ================= 04 知识层 ================= -->
+<section id="knowledge">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 04 · Knowledge Layer</div>
+      <h2>知识层：契约、M码、阈值与快照</h2>
+      <p class="lead">知识层是纯静态文件，<strong>不依赖任何运行时</strong>。它是整个数据库的"大脑皮层"——取数靠它找 M码，计算靠它定公式，点评靠它判松紧。</p>
+    </div>
+
+    <h3 class="reveal">data_contract.yaml · 单一事实源</h3>
+    <p>11 视角 × 5 数据源的完整契约。所有利差公式、阈值、M码映射都以此文件为准，Agent 与脚本不得硬编码。</p>
+    <div class="codeblock reveal">
+      <div class="clabel"><span>核心公式（契约定义）</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="cm"># 基准 = 国开债（备选 = 国债）</span>
+信用利差 CS = Y_credit(同评级同期限) − Y_国开债(同期限)
+期限利差 TS = Y_long − Y_short          <span class="cm"># 5Y-1Y / 10Y-1Y / 30Y-10Y</span>
+等级利差 RS = Y_lower − Y_higher        <span class="cm"># AAA-AA+ / AA+-AA / AA-AA-</span>
+品种利差 PS = Y_typeA − Y_typeB         <span class="cm"># 二级-普信 / 永续-二级</span>
+历史分位数  = Count(CS_hist ≤ CS_now) / N × 100%   <span class="cm"># 区间：2022年以来</span></pre>
+    </div>
+
+    <h3 class="reveal">阈值体系 · 国开债口径</h3>
+    <p>国开债利率天然比国债高约 15–30bp，故国开口径的利差阈值相应更低。<strong>所有阈值随信用周期变化，每年检视。</strong></p>
+    <table class="reveal">
+      <thead><tr><th>维度</th><th>偏紧 / 偏贵</th><th>中性</th><th>偏宽 / 便宜</th></tr></thead>
+      <tbody>
+        <tr><td>AAA 1Y 利差</td><td class="th-tight">&lt; 15 bp</td><td class="th-mid">15 ~ 30 bp</td><td class="th-loose">&gt; 50 bp</td></tr>
+        <tr><td>AAA 3Y 利差</td><td class="th-tight">&lt; 20 bp</td><td class="th-mid">20 ~ 35 bp</td><td class="th-loose">&gt; 55 bp</td></tr>
+        <tr><td>AAA 5Y 利差</td><td class="th-tight">&lt; 25 bp</td><td class="th-mid">25 ~ 40 bp</td><td class="th-loose">&gt; 60 bp</td></tr>
+        <tr><td>二级资本债 AAA- 5Y</td><td class="th-tight">&lt; 30 bp</td><td class="th-mid">30 ~ 55 bp</td><td class="th-loose">&gt; 70 bp</td></tr>
+        <tr><td>永续溢价（vs 二级）</td><td class="th-tight">&lt; 5 bp</td><td class="th-mid">5 ~ 15 bp</td><td class="th-loose">&gt; 20 bp</td></tr>
+        <tr><td>10Y AAA 利差</td><td class="th-tight">&lt; 30 bp</td><td class="th-mid">30 ~ 50 bp</td><td class="th-loose">&gt; 50 bp</td></tr>
+      </tbody>
+    </table>
+
+    <details class="reveal">
+      <summary>信用周期评分卡（5 维度）与四阶段策略</summary>
+      <div class="dbody">
+        <p><strong>评分卡维度</strong>：AAA 3Y 分位 · 等级利差 · 一级-二级偏离 · 评级下调 · 违约新增。得分 <span class="th-loose">+3~+5 积极下沉</span> / <span class="th-mid">0~+2 中性</span> / <span class="th-tight">-2~-1 防御</span> / <span class="th-tight">-5~-3 危机</span>。</p>
+        <p><strong>四阶段策略</strong>：信用扩张（拉久期+下沉）→ 信用平稳（持有+个券）→ 信用收缩（缩短久期→AAA）→ 信用危机（防御→国债）。</p>
+        <p><strong>AAA 3Y 周期参考</strong>：资产荒 20~30bp · 正常 30~50bp · 信用事件冲击 50~80bp · 危机 &gt;80bp。</p>
+      </div>
+    </details>
+
+    <h3 class="reveal">M码速查 · 踩坑标注</h3>
+    <p><code>ifind_edb_codes.yaml</code> 收录 380+ 已验证 M码，并标注了真实踩坑记录——例如 <code>M001618024</code> 是 <strong>4Y</strong> 而非 3Y，<code>中短票_AA+_5Y</code> 应为 <code>M001619336</code>。<code>ifind_edb_codes_extended.yaml</code> 为扩展码（周配额超限后定位、待验证）。</p>
+    <div class="callout warn reveal">
+      <div class="ct">iFinD 已知盲区</div>
+      二永债 EDB 无 M码 · 永续债收益率不存在 · 行业利差 p04983 仅合计行 · 一级发行利率 p04650 全部 "--" · TLAC / 美元债仅 Wind MCP 可取。这些视角请直接走 <strong>DM Quant API</strong>。
+    </div>
+
+    <h3 class="reveal">离线快照 · data_snapshot.json</h3>
+    <p>52 个指标的日度时序（约 50+ 交易日），结构为 <code>{"指标名": [{"d":"日期","v":数值}]}</code>。取数层全部失效时，计算层可直接读快照完成演示与回测。</p>
+    <div class="codeblock reveal">
+      <div class="clabel"><span>独立操作 · 直接读快照（零取数）</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">import</span> json
+snap = json.load(<span class="fn">open</span>(<span class="st">"knowledge/data_snapshot_20260717.json"</span>, encoding=<span class="st">"utf-8"</span>))
+aaa3y = snap[<span class="st">"中短票 AAA 3Y"</span>]      <span class="cm"># [{d,v}, {d,v}, ...]</span>
+cdb3y = snap[<span class="st">"国开债 3Y"</span>]
+cs = [(a[<span class="st">"v"</span>] - b[<span class="st">"v"</span>]) * 100 <span class="kw">for</span> a, b <span class="kw">in</span> <span class="fn">zip</span>(aaa3y, cdb3y)]  <span class="cm"># 利差 bp</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 05 输出层 ================= -->
+<section id="output">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 05 · Output Layer</div>
+      <h2>输出层：图表引擎、点评模板与看板</h2>
+      <p class="lead">输出层把计算结果变成<strong>周报可直接粘贴</strong>的产物：6 个 matplotlib 图表函数、6 套结构化点评模板、1 个 ECharts 自包含看板。</p>
+    </div>
+
+    <h3 class="reveal">图表引擎 · chart_credit_spread.py</h3>
+    <p>全局样式 SimHei / 微软雅黑，150dpi，<code>axes.unicode_minus=False</code>。每个函数接收纯数据、返回 <code>fig</code> 并落盘 PNG。</p>
+    <table class="reveal">
+      <thead><tr><th>函数</th><th>图表类型</th><th>输入</th><th>特征</th></tr></thead>
+      <tbody>
+        <tr><td><code>chart_cs_matrix()</code></td><td>利差热力图</td><td>df[行=评级, 列=期限]</td><td>RdYlGn_r · vmin=10 vmax=100</td></tr>
+        <tr><td><code>chart_cs_timeseries()</code></td><td>多系列利差折线</td><td>dates + {标签: 值列表}</td><td>含 40bp 参考线</td></tr>
+        <tr><td><code>chart_grade_spread()</code></td><td>等级利差折线</td><td>{"AAA-AA+ 3Y": [...]}</td><td>多评级对比</td></tr>
+        <tr><td><code>chart_cs_percentile()</code></td><td>分位数分组柱状</td><td>df[行=评级, 值=%]</td><td>20%偏贵 / 80%偏便宜参考线</td></tr>
+        <tr><td><code>chart_industry_spread()</code></td><td>行业利差横向柱状</td><td>行业列表 + bp 值</td><td>&gt;80红 / &lt;30绿 / 中位数线</td></tr>
+        <tr><td><code>chart_cs_combo()</code></td><td>双轴组合图</td><td>dates, cs, volume</td><td>利差折线 + 发行量柱状</td></tr>
+      </tbody>
+    </table>
+
+    <div class="codeblock reveal">
+      <div class="clabel"><span>独立调用 · 只复用图表引擎</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">from</span> templates.chart_credit_spread <span class="kw">import</span> chart_cs_matrix
+
+df = pd.DataFrame({<span class="st">"1Y"</span>:[12,18,25,40], <span class="st">"3Y"</span>:[16,24,32,55], <span class="st">"5Y"</span>:[20,30,42,70]},
+                  index=[<span class="st">"AAA"</span>,<span class="st">"AA+"</span>,<span class="st">"AA"</span>,<span class="st">"AA-"</span>])
+chart_cs_matrix(df, <span class="st">"信用利差矩阵（bp）"</span>, <span class="st">"output/cs_matrix_20260717.png"</span>)</pre>
+    </div>
+
+    <h3 class="reveal">点评模板 · commentary_credit_spread.md</h3>
+    <table class="reveal">
+      <thead><tr><th>#</th><th>模板</th><th>结构</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>信用利差周度总评</td><td>分评级/分期限走阔收窄 + 分位 + 驱动 + 展望</td></tr>
+        <tr><td>2</td><td>二永债周度跟踪</td><td>二级/永续/永续溢价 + 要点 + 策略观点</td></tr>
+        <tr><td>3</td><td>信用风险周度预警</td><td>评级调整 / 高利差 AAA / 违约展期</td></tr>
+        <tr><td>4</td><td>一级市场周度点评</td><td>发行 / 净融资 / 发行利率 vs 二级 / 认购倍数</td></tr>
+        <tr><td>5</td><td>行业利差月度</td><td>走阔收窄行业榜 + 原因归因</td></tr>
+        <tr><td>6</td><td>信用策略信号</td><td>评分卡 5 维度 → 久期/评级/品种建议</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="reveal">看板模板 · dashboard_template.html</h3>
+    <p>McKinsey 配色 ECharts 看板，含 <code>{{placeholder}}</code> 占位符（<code>{{mm_AAA_3Y}}</code> 矩阵值、<code>{{HM1}}/{{HM2}}</code> 热力数据注入）。区块覆盖利差总表热力图、城投矩阵、二永三卡、品种比价、期限/等级柱状图与 11 视角能力总览表。渲染后为<strong>自包含 HTML</strong>，可直接发送或浏览器打开。</p>
+
+    <div class="callout tip reveal">
+      <div class="ct">输出规范（铁律）</div>
+      所有产出物写入 <code>output/</code> 子目录 · 文件名含 <code>_YYYYMMDD</code> 日期后缀 · 历史版本不覆盖 · HTML 必须自包含（inline CSS/JS）· 同一文件不得同时存在于根目录与 output。
+    </div>
+  </div>
+</section>
+
+<!-- ================= 06 集成模式 ================= -->
+<section id="integration">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 06 · Integration Patterns</div>
+      <h2>集成模式：四种接入深度</h2>
+      <p class="lead">不必吞下整个 Skill。按你的场景选择接入深度——从"全流程编排"到"只拷一个图表函数"。</p>
+    </div>
+
+    <div class="tabs reveal">
+      <div class="tabbar">
+        <button class="active" onclick="showTab(event,'tab-full')">① 全流程集成</button>
+        <button onclick="showTab(event,'tab-fetch')">② 只取数</button>
+        <button onclick="showTab(event,'tab-knowledge')">③ 只查知识</button>
+        <button onclick="showTab(event,'tab-chart')">④ 只复用图表</button>
+      </div>
+
+      <div class="tabpanel active" id="tab-full">
+        <h4>适用：周报组装器 / 信用策略专题 / 定期看板</h4>
+        <p>走完整 L0→L4 管线：UnifiedFetcher 取数 → 契约公式计算利差与分位数 → 阈值判断 + 评分卡 → 图表 + 点评 + 看板一次成型。</p>
+        <div class="codeblock">
+          <div class="clabel"><span>全流程 Prompt</span></div>
+          <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="st">"用 credit-spread-db 生成本周信用利差周度看板，
+ 输出到 output/，并给出 6 段式文字点评。"</span></pre>
+        </div>
+        <p><strong>依赖</strong>：全部 4 层 · <strong>产物</strong>：HTML 看板 + PNG 图表 + MD 点评</p>
+      </div>
+
+      <div class="tabpanel" id="tab-fetch">
+        <h4>适用：其他 Skill 需要信用债 YTM / 利差原始数据</h4>
+        <p>只取 L0+L1。直接 <code>import</code> UnifiedFetcher 或 DmFetcher，拿到 DataFrame / dict 即走，不触碰知识与输出层。</p>
+        <div class="codeblock">
+          <div class="clabel"><span>只取数</span></div>
+          <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">from</span> fetcher <span class="kw">import</span> UnifiedFetcher
+y = UnifiedFetcher().get_yield(<span class="st">"中短票_AAA_3Y"</span>, <span class="st">"20260617"</span>, <span class="st">"20260717"</span>)</pre>
+        </div>
+        <p><strong>依赖</strong>：fetcher/ + config.json · <strong>产物</strong>：内存数据对象</p>
+      </div>
+
+      <div class="tabpanel" id="tab-knowledge">
+        <h4>适用：人工查阈值 / 查 M码 / 离线回测</h4>
+        <p>只取 L2。纯静态文件，<strong>零运行时依赖</strong>——拷走 <code>data_contract.yaml</code> + <code>thresholds.md</code> + 快照即可在任何环境使用。</p>
+        <div class="codeblock">
+          <div class="clabel"><span>只查知识</span></div>
+          <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="cm"># 查 M码</span>
+grep <span class="st">"中短票_AAA_3Y"</span> knowledge/ifind_edb_codes.yaml
+<span class="cm"># 查阈值</span>
+grep <span class="st">"AAA 3Y"</span> knowledge/thresholds.md</pre>
+        </div>
+        <p><strong>依赖</strong>：无 · <strong>产物</strong>：配置 / 规则 / 离线时序</p>
+      </div>
+
+      <div class="tabpanel" id="tab-chart">
+        <h4>适用：已有自己的数据管线，只缺周报级图表</h4>
+        <p>只取 L4 的 <code>chart_credit_spread.py</code>。6 个函数接收纯数据、返回 fig + PNG，与取数/知识层完全解耦。</p>
+        <div class="codeblock">
+          <div class="clabel"><span>只复用图表</span></div>
+          <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="kw">from</span> templates.chart_credit_spread <span class="kw">import</span> chart_industry_spread
+chart_industry_spread([<span class="st">"煤炭"</span>,<span class="st">"钢铁"</span>,<span class="st">"地产"</span>], [35, 48, 92], save_path=<span class="st">"ind.png"</span>)</pre>
+        </div>
+        <p><strong>依赖</strong>：matplotlib + pandas · <strong>产物</strong>：150dpi PNG</p>
+      </div>
+    </div>
+
+    <h3 class="reveal">集成深度对比</h3>
+    <table class="reveal">
+      <thead><tr><th>模式</th><th>涉及层</th><th>运行时依赖</th><th>凭证需求</th><th>典型产物</th></tr></thead>
+      <tbody>
+        <tr><td>① 全流程</td><td>L0–L4</td><td>requests + pandas + matplotlib + ECharts</td><td>DM key（或 iFinD token）</td><td>HTML 看板 + PNG + 点评</td></tr>
+        <tr><td>② 只取数</td><td>L0–L1</td><td>requests（AKShare 可选）</td><td>DM key（或 token / 无）</td><td>DataFrame / dict</td></tr>
+        <tr><td>③ 只查知识</td><td>L2</td><td>无</td><td>无</td><td>规则 / M码 / 快照</td></tr>
+        <tr><td>④ 只复用图表</td><td>L4</td><td>matplotlib + pandas</td><td>无</td><td>PNG 图表</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 07 获取 Skill ================= -->
+<section id="get-skill">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-kicker">Chapter 07 · Get the Skill</div>
+      <h2>获取 Skill：一句 Prompt 安装</h2>
+      <p class="lead">在 AI Agent 对话框中输入以下任意一句，Agent 会自动完成下载、安装与依赖配置。</p>
+    </div>
+
+    <div class="codeblock reveal">
+      <div class="clabel"><span>安装 Prompt · 写法一</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="st">"安装 credit-spread-db skill"</span></pre>
+    </div>
+    <div class="codeblock reveal">
+      <div class="clabel"><span>安装 Prompt · 写法二</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="st">"安装信用利差数据库 skill，配置 DM Quant API 凭证"</span></pre>
+    </div>
+
+    <h3 class="reveal">Skill Installer API</h3>
+    <div class="codeblock reveal">
+      <div class="clabel"><span>GET · 返回可用 Skill 列表 + 下载地址</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre>GET https://kmrhoavgygtv.sealosbja.site/api/skill-installer
+<span class="cm">&lt;!-- 返回可用 Skill 列表 + 下载地址 --&gt;</span>
+<span class="cm">&lt;!-- Agent 解析后自动下载、解压、注册到本地环境 --&gt;</span></pre>
+    </div>
+
+    <div class="callout tip reveal">
+      <div class="ct">商店直链</div>
+      <a href="https://kmrhoavgygtv.sealosbja.site" style="color:var(--c-teal);font-weight:bold">https://kmrhoavgygtv.sealosbja.site</a> — 在 Skill 商店搜索「信用利差数据库」或「credit-spread-db」。
+    </div>
+
+    <h3 class="reveal">安装后验证</h3>
+    <div class="codeblock reveal">
+      <div class="clabel"><span>验证 Prompt</span></div>
+      <button class="copy" onclick="copyCode(this)">COPY</button>
+<pre><span class="st">"运行 credit-spread-db 的 fetcher.status()，确认四数据源状态，
+ 并用 DM API 取一次 AAA 3Y 利差验证连通性。"</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 页脚 ================= -->
+<footer class="rpt">
+  <div class="wrap">
+    <span>credit-spread-db · Technical Architecture Manual · 作者：叶青</span>
+    <span><a href="https://github.com/yeqing-credit/credit-spread-db-arch" id="gh-link-foot">GitHub 开源仓库</a></span>
+    <span>fioutput Report Design System · Navy · 2026-08-02 · v1.0.0</span>
+  </div>
+</footer>
+
+<script>
+/* ---------- 阅读进度条 ---------- */
+window.addEventListener('scroll', function(){
+  var h = document.documentElement;
+  var pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('progress').style.width = pct + '%';
+});
+
+/* ---------- Scrollspy ---------- */
+(function(){
+  var links = document.querySelectorAll('nav.toc a');
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting && map[e.target.id]){
+        links.forEach(function(a){ a.classList.remove('active'); });
+        map[e.target.id].classList.add('active');
+      }
+    });
+  }, {rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){ obs.observe(s); });
+})();
+
+/* ---------- 滚动显现 ---------- */
+(function(){
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target);} });
+  }, {threshold:0.08});
+  document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+})();
+
+/* ---------- 数字计数动画 ---------- */
+(function(){
+  function animate(el){
+    var target = parseInt(el.getAttribute('data-target'),10);
+    var dur = 1400, t0 = null;
+    function step(ts){
+      if(!t0) t0 = ts;
+      var p = Math.min((ts - t0)/dur, 1);
+      var eased = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.round(target * eased);
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ animate(e.target); obs.unobserve(e.target);} });
+  }, {threshold:0.5});
+  document.querySelectorAll('.cnt').forEach(function(el){ obs.observe(el); });
+})();
+
+/* ---------- 代码复制 ---------- */
+function copyCode(btn){
+  var pre = btn.parentElement.querySelector('pre');
+  var txt = pre.innerText;
+  navigator.clipboard.writeText(txt).then(function(){
+    btn.textContent = 'COPIED'; btn.classList.add('done');
+    setTimeout(function(){ btn.textContent = 'COPY'; btn.classList.remove('done'); }, 1600);
+  });
+}
+
+/* ---------- Tab 切换 ---------- */
+function showTab(ev, id){
+  var tabs = ev.target.closest('.tabs');
+  tabs.querySelectorAll('.tabbar button').forEach(function(b){ b.classList.remove('active'); });
+  tabs.querySelectorAll('.tabpanel').forEach(function(p){ p.classList.remove('active'); });
+  ev.target.classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------- ECharts 模块依赖 DAG ---------- */
+(function(){
+  var dom = document.getElementById('dag');
+  if(!dom || typeof echarts === 'undefined') return;
+  var chart = echarts.init(dom);
+
+  var L = {L0:'#4A7A8C', L1:'#12707E', L2:'#C8A45A', L3:'#0E4D64', L4:'#051C2C'};
+  function n(name, x, y, layer, size){
+    return {name:name, x:x, y:y, symbolSize:size||46,
+      itemStyle:{color:L[layer], borderColor:'#fff', borderWidth:1},
+      label:{show:true, position:'right', color:'#16242E', fontSize:11, fontFamily:'Consolas'}};
+  }
+  var nodes = [
+    /* L0 数据源 (y=560) */
+    n('DM Quant API', 90, 560, 'L0', 52), n('iFinD HTTP', 300, 560, 'L0', 48),
+    n('AKShare', 510, 560, 'L0', 46), n('Wind MCP', 710, 560, 'L0', 42), n('iFinD MCP', 900, 560, 'L0', 42),
+    /* L1 取数层 (y=430) */
+    n('dm_fetcher', 90, 430, 'L1', 50), n('ifind_fetcher', 300, 430, 'L1', 46),
+    n('akshare_fetcher', 510, 430, 'L1', 44), n('unified_fetcher', 740, 430, 'L1', 56),
+    /* L2 知识层 (y=300) */
+    n('edb_codes', 120, 300, 'L2', 44), n('data_contract', 340, 300, 'L2', 52),
+    n('thresholds', 560, 300, 'L2', 46), n('view_defs', 760, 300, 'L2', 42), n('snapshot', 930, 300, 'L2', 44),
+    /* L3 计算层 (y=175) */
+    n('利差计算引擎', 280, 175, 'L3', 56), n('阈值判断', 560, 175, 'L3', 48), n('评分卡', 800, 175, 'L3', 46),
+    /* L4 输出层 (y=55) */
+    n('图表引擎', 180, 55, 'L4', 50), n('点评模板', 480, 55, 'L4', 46), n('HTML看板', 760, 55, 'L4', 52)
+  ];
+  function e(s,t){ return {source:s, target:t, lineStyle:{color:'#9FB6C4', width:1.4, curveness:0.08}}; }
+  var links = [
+    e('DM Quant API','dm_fetcher'), e('iFinD HTTP','ifind_fetcher'), e('AKShare','akshare_fetcher'),
+    e('dm_fetcher','unified_fetcher'), e('ifind_fetcher','unified_fetcher'), e('akshare_fetcher','unified_fetcher'),
+    e('Wind MCP','unified_fetcher'), e('iFinD MCP','unified_fetcher'),
+    e('edb_codes','unified_fetcher'),
+    e('unified_fetcher','利差计算引擎'), e('snapshot','利差计算引擎'), e('data_contract','利差计算引擎'),
+    e('view_defs','data_contract'),
+    e('利差计算引擎','阈值判断'), e('thresholds','阈值判断'), e('阈值判断','评分卡'),
+    e('利差计算引擎','图表引擎'), e('利差计算引擎','HTML看板'),
+    e('thresholds','点评模板'), e('评分卡','点评模板'), e('图表引擎','HTML看板')
+  ];
+  chart.setOption({
+    tooltip:{trigger:'item', backgroundColor:'#051C2C', borderColor:'#C8A45A', textStyle:{color:'#fff', fontFamily:'Georgia'}},
+    legend:{data:['L0 数据源','L1 取数层','L2 知识层','L3 计算层','L4 输出层'],
+      bottom:0, textStyle:{color:'#33424D', fontFamily:'Georgia', fontSize:12},
+      itemWidth:14, itemHeight:14},
+    series:[{
+      type:'graph', layout:'none', coordinateSystem:null,
+      data:nodes.map(function(nd){
+        var layer = nd.itemStyle.color===L.L0?'L0 数据源':nd.itemStyle.color===L.L1?'L1 取数层':
+                    nd.itemStyle.color===L.L2?'L2 知识层':nd.itemStyle.color===L.L3?'L3 计算层':'L4 输出层';
+        nd.category = ['L0 数据源','L1 取数层','L2 知识层','L3 计算层','L4 输出层'].indexOf(layer);
+        return nd;
+      }),
+      links:links,
+      categories:[{name:'L0 数据源'},{name:'L1 取数层'},{name:'L2 知识层'},{name:'L3 计算层'},{name:'L4 输出层'}],
+      roam:true, draggable:true,
+      edgeSymbol:['none','arrow'], edgeSymbolSize:[0,8],
+      emphasis:{focus:'adjacency', lineStyle:{width:3, color:'#C8A45A'}},
+      lineStyle:{opacity:0.7}
+    }]
+  });
+  window.addEventListener('resize', function(){ chart.resize(); });
+})();
+</script>
+</body>
+</html>
