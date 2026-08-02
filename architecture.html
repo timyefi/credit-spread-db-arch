@@ -15,6 +15,17 @@
 <meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
 <meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
 
+<meta name="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:title" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta property="og:description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+<meta property="og:url" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="投研AI家园">
+<meta itemprop="name" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+
 <meta name="description" content="信用利差数据库（credit-spread-db）技术架构手册：11视角×5数据源×4取数引擎的解耦架构、接口契约与集成指南。作者：叶青">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
@@ -676,6 +687,10 @@ etf = uf.get_etf([<span class="st">"511260"</span>], <span class="st">"20260617"
 
     <h3 class="reveal">阈值体系 · 国开债口径</h3>
     <p>国开债利率天然比国债高约 15–30bp，故国开口径的利差阈值相应更低。<strong>所有阈值随信用周期变化，每年检视。</strong></p>
+    <div class="callout tip reveal">
+      <div class="ct">框架 > 具体数值</div>
+      下表提供的是一套<strong>可复用的判断框架</strong>（维度划分 + 松紧方向 + 三档结构），而非一成不变的知识。每个团队应结合自身研究体系定期校准阈值——推荐做法：用历史利差序列做<strong>市场回验</strong>（如取 2022 年以来分位数分布、信用事件前后利差中枢漂移），用数据驱动替代经验拍脑袋。阈值文件 <code>thresholds.md</code> 设计为 preserve 模式，鼓励用户覆盖为自己的版本。
+    </div>
     <table class="reveal">
       <thead><tr><th>维度</th><th>偏紧 / 偏贵</th><th>中性</th><th>偏宽 / 便宜</th></tr></thead>
       <tbody>
@@ -687,6 +702,15 @@ etf = uf.get_etf([<span class="st">"511260"</span>], <span class="st">"20260617"
         <tr><td>10Y AAA 利差</td><td class="th-tight">&lt; 30 bp</td><td class="th-mid">30 ~ 50 bp</td><td class="th-loose">&gt; 50 bp</td></tr>
       </tbody>
     </table>
+
+    <details class="reveal">
+      <summary>阈值回验方法论（潜在用法）</summary>
+      <div class="dbody">
+        <p><strong>定期回验流程</strong>：取近 N 年（建议 3–5 年）日度利差序列 → 计算分位数分布 → 标注信用事件窗口（如永煤、恒大）→ 比较事件前后中枢漂移 → 更新三档阈值。</p>
+        <p><strong>自适应建议</strong>：资产荒年份（如 2024–2025）利差中枢系统性下移，阈值应整体下调 5–10bp；信用收缩年份则上调。评分卡权重同理——违约频发期提高「违约新增」维度权重。</p>
+        <p><strong>工具支持</strong>：<code>data_snapshot.json</code> 提供 52 指标日度序列，可直接用于分位数回算；DM API <code>get_yield_curve()</code> 支持最长 1 月跨度批量取历史数据拼接长序列。</p>
+      </div>
+    </details>
 
     <details class="reveal">
       <summary>信用周期评分卡（5 维度）与四阶段策略</summary>
