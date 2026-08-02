@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>credit-spread-db 技术架构手册 · 信用利差数据库</title>
+<meta name="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:title" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta property="og:description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta property="og:image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+<meta property="og:url" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="投研AI家园">
+<meta itemprop="name" content="credit-spread-db 信用利差数据库 技术架构手册 | 投研AI家园">
+<meta itemprop="description" content="信用利差数据库五层解耦架构：L0数据源→L1取数层(4引擎自动降级)→L2知识层(11视角契约/380+M码/阈值)→L3计算层(CS/TS/RS/PS利差引擎)→L4输出层(图表/点评/看板)。含接口契约、独立调用示例、4种集成模式。作者：叶青">
+<meta itemprop="image" content="https://kmrhoavgygtv.sealosbja.site/pages/tutorial-credit-spread-db-architecture/cover.png">
+
 <meta name="description" content="信用利差数据库（credit-spread-db）技术架构手册：11视角×5数据源×4取数引擎的解耦架构、接口契约与集成指南。作者：叶青">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
@@ -851,7 +862,7 @@ chart_industry_spread([<span class="st">"煤炭"</span>,<span class="st">"钢铁
     <div class="reveal">
       <div class="sec-kicker">Chapter 07 · Get the Skill</div>
       <h2>获取 Skill：一句 Prompt 安装</h2>
-      <p class="lead">在 AI Agent 对话框中输入以下任意一句，Agent 会自动完成下载、安装与依赖配置。</p>
+      <p class="lead">请先访问 <a href="https://kmrhoavgygtv.sealosbja.site/api/skill-installer" style="color:var(--c-teal);font-weight:bold">https://kmrhoavgygtv.sealosbja.site/api/skill-installer</a> 获取可用 Skill 列表与下载地址，然后在 AI Agent 对话框中输入以下任意一句，Agent 会自动完成下载、安装与依赖配置。</p>
     </div>
 
     <div class="codeblock reveal">
@@ -863,15 +874,6 @@ chart_industry_spread([<span class="st">"煤炭"</span>,<span class="st">"钢铁
       <div class="clabel"><span>安装 Prompt · 写法二</span></div>
       <button class="copy" onclick="copyCode(this)">COPY</button>
 <pre><span class="st">"安装信用利差数据库 skill，配置 DM Quant API 凭证"</span></pre>
-    </div>
-
-    <h3 class="reveal">Skill Installer API</h3>
-    <div class="codeblock reveal">
-      <div class="clabel"><span>GET · 返回可用 Skill 列表 + 下载地址</span></div>
-      <button class="copy" onclick="copyCode(this)">COPY</button>
-<pre>GET https://kmrhoavgygtv.sealosbja.site/api/skill-installer
-<span class="cm">&lt;!-- 返回可用 Skill 列表 + 下载地址 --&gt;</span>
-<span class="cm">&lt;!-- Agent 解析后自动下载、解压、注册到本地环境 --&gt;</span></pre>
     </div>
 
     <div class="callout tip reveal">
